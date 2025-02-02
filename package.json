@@ -1,0 +1,21 @@
+{
+  "name": "usignalbot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7",
+    "node-binance-api": "^0.13.1",
+    "node-telegram-bot-api": "^0.66.0",
+    "punycode": "^2.3.1",
+    "sqlite3": "^5.1.7",
+    "tulind": "^0.8.20"
+  }
+}
