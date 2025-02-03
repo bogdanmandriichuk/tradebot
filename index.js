@@ -28,14 +28,9 @@ async function isUserAllowed(userId) {
 // Function to check if the pair is available on Binance
 async function isPairAvailable(pair) {
     try {
-        // Request to Binance to get available pairs
         const response = await axios.get('https://api.binance.com/api/v3/exchangeInfo');
-
-        // Check if pair is available in the list of symbols
         const symbols = response.data.symbols;
-        const pairExists = symbols.some(symbol => symbol.symbol === pair);
-
-        return pairExists;
+        return symbols.some(symbol => symbol.symbol === pair);
     } catch (error) {
         console.error("❌ Error checking pair availability:", error.message);
         return false;
@@ -45,19 +40,13 @@ async function isPairAvailable(pair) {
 // Function to get market signal (RSI, MACD, EMA)
 async function getMarketSignal(pair = 'GBPCHF') {
     try {
-        // Check if pair is valid and available on Binance
         const isAvailable = await isPairAvailable(pair);
         if (!isAvailable) {
             return { direction: '❌ Pair not available', time: '⏳ N/A' };
         }
 
-        // Fetch candlestick data from Binance using axios
         const response = await axios.get(`https://api.binance.com/api/v3/klines`, {
-            params: {
-                symbol: pair,
-                interval: '1m',  // Adjusted to 1-minute intervals
-                limit: 50
-            }
+            params: { symbol: pair, interval: '1m', limit: 50 }
         });
 
         if (response.status !== 200) {
@@ -66,15 +55,12 @@ async function getMarketSignal(pair = 'GBPCHF') {
         }
 
         const ticks = response.data;
-
         if (!ticks || ticks.length === 0) {
             console.error('❌ No candlestick data returned');
             return { direction: '⏸ Undefined', time: '⏳ N/A' };
         }
 
-        const closePrices = ticks.map(t => parseFloat(t[4])); // Closing prices
-
-        // Extract additional data from the API response for display
+        const closePrices = ticks.map(t => parseFloat(t[4]));
         const openPrice = parseFloat(ticks[ticks.length - 1][1]);
         const closePrice = parseFloat(ticks[ticks.length - 1][4]);
         const highPrice = parseFloat(ticks[ticks.length - 1][2]);
@@ -99,54 +85,20 @@ async function getMarketSignal(pair = 'GBPCHF') {
                             if (err) return reject(`❌ Error calculating EMA21: ${err.message}`);
                             const ema21 = ema21Result[0].slice(-1)[0];
 
-                            // More aggressive condition for Buy (Up)
-                            if (rsi < 30 && macd > signalLine && ema9 > ema21) {
-                                return resolve({
-                                    direction: '🔼 Up (Buy)',
-                                    time: '⏳ 1 minute',
-                                    openPrice,
-                                    closePrice,
-                                    highPrice,
-                                    lowPrice,
-                                    volume
-                                });
+                            let direction = '🔼 Up (Buy)';
+                            if (rsi > 50 || (macd < signalLine && ema9 < ema21)) {
+                                direction = '🔽 Down (Sell)';
                             }
 
-                            // More aggressive condition for Sell (Down)
-                            if (rsi > 70 && macd < signalLine && ema9 < ema21) {
-                                return resolve({
-                                    direction: '🔽 Down (Sell)',
-                                    time: '⏳ 1 minute',
-                                    openPrice,
-                                    closePrice,
-                                    highPrice,
-                                    lowPrice,
-                                    volume
-                                });
-                            }
-
-                            // If no clear signal, use mixed approach to predict direction
-                            if (macd > signalLine && ema9 > ema21) {
-                                resolve({
-                                    direction: '🔼 Up (Buy)',
-                                    time: '⏳ 1 minute',
-                                    openPrice,
-                                    closePrice,
-                                    highPrice,
-                                    lowPrice,
-                                    volume
-                                });
-                            } else {
-                                resolve({
-                                    direction: '🔽 Down (Sell)',
-                                    time: '⏳ 1 minute',
-                                    openPrice,
-                                    closePrice,
-                                    highPrice,
-                                    lowPrice,
-                                    volume
-                                });
-                            }
+                            resolve({
+                                direction,
+                                time: '⏳ 1 minute',
+                                openPrice,
+                                closePrice,
+                                highPrice,
+                                lowPrice,
+                                volume
+                            });
                         });
                     });
                 });
@@ -158,17 +110,12 @@ async function getMarketSignal(pair = 'GBPCHF') {
     }
 }
 
-// /start command
 bot.onText(/\/start/, (msg) => {
     bot.sendMessage(msg.chat.id, "👋 Welcome! Choose a currency pair for analysis:", {
-        reply_markup: {
-            keyboard: pairs.map(p => [{ text: `📈 ${p}` }]),
-            resize_keyboard: true,
-        },
+        reply_markup: { keyboard: pairs.map(p => [{ text: `📈 ${p}` }]), resize_keyboard: true }
     });
 });
 
-// Handle pair selection
 bot.on('message', async (msg) => {
     const text = msg.text;
     if (pairs.includes(text.replace('📈 ', ''))) {
@@ -181,14 +128,7 @@ bot.on('message', async (msg) => {
                 const signal = await getMarketSignal(pair);
                 bot.sendMessage(
                     userId,
-                    `📢 *Market Signal (${pair})*  
-📊 *Prediction:* ${signal.direction}  
-⏳ *Time:* ${signal.time}  
-📉 *Open Price:* ${signal.openPrice}  
-📈 *Close Price:* ${signal.closePrice}  
-📊 *High Price:* ${signal.highPrice}  
-📉 *Low Price:* ${signal.lowPrice}  
-📊 *Volume:* ${signal.volume}`,
+                    `📢 *Market Signal (${pair})*  \n📊 *Prediction:* ${signal.direction}  \n⏳ *Time:* ${signal.time}  \n📉 *Open Price:* ${signal.openPrice}  \n📈 *Close Price:* ${signal.closePrice}  \n📊 *High Price:* ${signal.highPrice}  \n📉 *Low Price:* ${signal.lowPrice}  \n📊 *Volume:* ${signal.volume}`,
                     { parse_mode: 'Markdown' }
                 );
             } else {
