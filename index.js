@@ -37,7 +37,16 @@ async function isPairAvailable(pair) {
     }
 }
 
+// Function to adapt signal for USD if needed
+function adaptSignalForBinomo(pair, signal) {
+    if (pair.includes('USDT')) {
+        pair = pair.replace('USDT', 'USD');
+    }
+    return { ...signal, pair };
+}
+
 // Function to get market signal (RSI, MACD, EMA)
+// Функція для отримання ринкового сигналу з додатковими індикаторами
 async function getMarketSignal(pair = 'GBPCHF') {
     try {
         const isAvailable = await isPairAvailable(pair);
@@ -46,7 +55,7 @@ async function getMarketSignal(pair = 'GBPCHF') {
         }
 
         const response = await axios.get(`https://api.binance.com/api/v3/klines`, {
-            params: { symbol: pair, interval: '1m', limit: 50 }
+            params: { symbol: pair, interval: '1m', limit: 200 } // збільшено кількість свічок
         });
 
         if (response.status !== 200) {
@@ -86,11 +95,11 @@ async function getMarketSignal(pair = 'GBPCHF') {
                             const ema21 = ema21Result[0].slice(-1)[0];
 
                             let direction = '🔼 Up (Buy)';
-                            if (rsi > 50 || (macd < signalLine && ema9 < ema21)) {
+                            if (rsi > 70 || (macd < signalLine && ema9 < ema21)) {
                                 direction = '🔽 Down (Sell)';
                             }
 
-                            resolve({
+                            const signal = {
                                 direction,
                                 time: '⏳ 1 minute',
                                 openPrice,
@@ -98,7 +107,9 @@ async function getMarketSignal(pair = 'GBPCHF') {
                                 highPrice,
                                 lowPrice,
                                 volume
-                            });
+                            };
+
+                            resolve(adaptSignalForBinomo(pair, signal));
                         });
                     });
                 });
@@ -110,25 +121,30 @@ async function getMarketSignal(pair = 'GBPCHF') {
     }
 }
 
+
+// Handle /start command
 bot.onText(/\/start/, (msg) => {
     bot.sendMessage(msg.chat.id, "👋 Welcome! Choose a currency pair for analysis:", {
         reply_markup: { keyboard: pairs.map(p => [{ text: `📈 ${p}` }]), resize_keyboard: true }
     });
 });
 
+// Handle messages
 bot.on('message', async (msg) => {
     const text = msg.text;
+    const userId = msg.from.id;
+
     if (pairs.includes(text.replace('📈 ', ''))) {
         const pair = text.replace('📈 ', '');
-        const userId = msg.from.id;
 
         try {
             if (await isUserAllowed(userId)) {
                 bot.sendMessage(userId, `📊 Analyzing the market for *${pair}*...`);
                 const signal = await getMarketSignal(pair);
+
                 bot.sendMessage(
                     userId,
-                    `📢 *Market Signal (${pair})*  \n📊 *Prediction:* ${signal.direction}  \n⏳ *Time:* ${signal.time}  \n📉 *Open Price:* ${signal.openPrice}  \n📈 *Close Price:* ${signal.closePrice}  \n📊 *High Price:* ${signal.highPrice}  \n📉 *Low Price:* ${signal.lowPrice}  \n📊 *Volume:* ${signal.volume}`,
+                    `📢 *Market Signal (${signal.pair})*  \n📊 *Prediction:* ${signal.direction}  \n⏳ *Time:* ${signal.time}  \n📉 *Open Price:* ${signal.openPrice}  \n📈 *Close Price:* ${signal.closePrice}  \n📊 *High Price:* ${signal.highPrice}  \n📉 *Low Price:* ${signal.lowPrice}  \n📊 *Volume:* ${signal.volume}`,
                     { parse_mode: 'Markdown' }
                 );
             } else {
